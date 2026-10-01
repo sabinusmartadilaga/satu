@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Ujian Daring - SMAN 1 Simpang Hulu</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2pdf.js for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        
+        /* Print Styles */
+        @media print {
+            body { background: white !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            #app-container { display: none !important; }
+            #print-wrapper { display: block !important; position: static !important; }
+            .kop-surat { border-bottom: 4px double black !important; margin-bottom: 20px; padding-bottom: 10px; text-align: center; }
+        }
+        
+        /* Specific PDF export adjustments */
+        .pdf-mode { padding: 15px !important; background: white !important; color: black !important; }
+        .kop-surat h1 { font-size: 16pt; font-weight: bold; margin: 0; text-transform: uppercase; line-height: 1.2; }
+        .kop-surat h2 { font-size: 18pt; font-weight: bold; margin: 0; text-transform: uppercase; line-height: 1.2; }
+        .kop-surat p { font-size: 11pt; margin: 2px 0; }
+        
+        .signature-area { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
+        .signature-box { text-align: center; width: 45%; }
+        .signature-name { font-weight: bold; text-decoration: underline; margin-top: 70px; }
+        
+        /* Responsive adjustments */
+        .cbt-radio-btn input:checked + div { border-color: #3b82f6; background-color: #eff6ff; }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Modals -->
+    <div id="modal-alert" class="fixed inset-0 bg-black/60 z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 animate-pulse-once">
+            <h3 id="modal-title" class="text-xl font-bold mb-2">Info</h3>
+            <p id="modal-msg" class="text-gray-600 mb-6"></p>
+            <div class="flex justify-end gap-2" id="modal-actions">
+                <button id="modal-btn-cancel" class="hidden px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Batal</button>
+                <button id="modal-btn-ok" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container Utama -->
+    <div id="app-container" class="flex-1 overflow-hidden flex flex-col relative w-full h-full">
+        
+        <!-- VIEW: Home -->
+        <div id="view-home" class="view-section flex-1 overflow-y-auto flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-slate-100">
+            <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border-t-4 border-blue-600">
+                <img src="https://placehold.co/100x100/2563eb/ffffff?text=CBT" alt="Logo" class="mx-auto rounded-full mb-4 shadow">
+                <h1 class="text-2xl font-bold text-gray-800 mb-1">CBT Ujian Daring</h1>
+                <p class="text-gray-500 text-sm font-medium mb-8" id="lbl-school-name">SMA NEGERI 1 SIMPANG HULU</p>
+                
+                <div class="space-y-4">
+                    <button onclick="nav('student_login')" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                        <i class="fas fa-user-edit"></i> Portal Siswa
+                    </button>
+                    <button onclick="nav('teacher_login')" class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                        <i class="fas fa-chalkboard-teacher"></i> Ruang Guru
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Teacher Login -->
+        <div id="view-teacher_login" class="view-section hidden flex-1 overflow-y-auto flex items-center justify-center p-4">
+            <div class="bg-white p-8 rounded-2xl shadow-xl max-w-sm w-full">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Otorisasi Guru</h2>
+                    <button onclick="nav('home')" class="text-gray-400 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+                </div>
+                <input type="password" id="input-teacher-pwd" class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-blue-500 outline-none mb-4" placeholder="Masukkan Sandi..." onkeypress="if(event.key==='Enter') loginTeacher()">
+                <button onclick="loginTeacher()" class="w-full py-3 bg-slate-800 text-white rounded-lg font-bold">Masuk</button>
+            </div>
+        </div>
+
+        <!-- VIEW: Teacher Dashboard -->
+        <div id="view-teacher_dash" class="view-section hidden flex-1 flex flex-col md:flex-row bg-slate-50 overflow-hidden h-full">
+            
+            <!-- Mobile Header & Hamburger -->
+            <div class="md:hidden bg-slate-800 text-white p-4 flex justify-between items-center shadow-md z-20">
+                <h1 class="font-bold">Panel Guru</h1>
+                <button onclick="toggleSidebar()"><i class="fas fa-bars text-2xl"></i></button>
+            </div>
+
+            <!-- Sidebar -->
+            <aside id="teacher-sidebar" class="fixed inset-y-0 left-0 z-30 w-64 bg-slate-800 text-white flex flex-col transform -translate-x-full transition-transform duration-300 md:relative md:translate-x-0 overflow-y-auto shadow-xl">
+                <div class="p-5 border-b border-slate-700 text-center">
+                    <img src="https://placehold.co/60x60/3b82f6/fff?text=Guru" class="mx-auto rounded-full mb-2">
+                    <h2 class="font-bold" id="lbl-guru-name">Sabinus Sasmi M</h2>
+                    <p class="text-xs text-slate-400">Administrator</p>
+                </div>
+                <nav class="flex-1 p-2 space-y-1">
+                    <a href="#" onclick="showAdminTab('dash'); toggleSidebar()" id="nav-dash" class="admin-nav block p-3 rounded-lg hover:bg-slate-700 bg-blue-600 font-medium"><i class="fas fa-home w-6"></i> Dashboard</a>
+                    <a href="#" onclick="showAdminTab('identitas'); toggleSidebar()" id="nav-identitas" class="admin-nav block p-3 rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-school w-6"></i> Identitas & KOP</a>
+                    <a href="#" onclick="showAdminTab('master'); toggleSidebar()" id="nav-master" class="admin-nav block p-3 rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-database w-6"></i> Master Data</a>
+                    <a href="#" onclick="showAdminTab('banksoal'); toggleSidebar()" id="nav-banksoal" class="admin-nav block p-3 rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-file-alt w-6"></i> Bank Soal</a>
+                    <a href="#" onclick="showAdminTab('ujian'); toggleSidebar()" id="nav-ujian" class="admin-nav block p-3 rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-cogs w-6"></i> Kelola Ujian</a>
+                    <a href="#" onclick="showAdminTab('laporan'); toggleSidebar()" id="nav-laporan" class="admin-nav block p-3 rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-chart-bar w-6"></i> Hasil & Analisis</a>
+                    <a href="#" onclick="showAdminTab('jurnal'); toggleSidebar()" id="nav-jurnal" class="admin-nav block p-3 rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-book w-6"></i> Jurnal Mengajar</a>
+                </nav>
+                <div class="p-4 border-t border-slate-700">
+                    <button onclick="logoutTeacher()" class="w-full py-2 bg-red-500 hover:bg-red-600 rounded-lg font-bold"><i class="fas fa-sign-out-alt"></i> Keluar</button>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto p-4 md:p-6 w-full relative">
+                <!-- Overlay for mobile sidebar -->
+                <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-20 hidden md:hidden" onclick="toggleSidebar()"></div>
+                
+                <!-- Tab: Dashboard -->
+                <div id="tab-dash" class="admin-tab space-y-6">
+                    <h2 class="text-2xl font-bold">Ringkasan Sistem</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+                            <p class="text-sm text-gray-500">Status Ujian</p>
+                            <h3 class="text-xl font-bold" id="stat-ujian">Nonaktif</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-yellow-500">
+                            <p class="text-sm text-gray-500">Token Aktif</p>
+                            <h3 class="text-xl font-bold tracking-widest" id="stat-token">-</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
+                            <p class="text-sm text-gray-500">Total Soal</p>
+                            <h3 class="text-xl font-bold" id="stat-soal">0</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+                            <p class="text-sm text-gray-500">Peserta Selesai</p>
+                            <h3 class="text-xl font-bold" id="stat-peserta">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Identitas -->
+                <div id="tab-identitas" class="admin-tab hidden space-y-4">
+                    <h2 class="text-2xl font-bold">Identitas Sekolah & Kop Surat</h2>
+                    <form onsubmit="saveIdentitas(event)" class="bg-white p-6 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Dinas / Instansi Atas</label>
+                            <input type="text" id="id-dinas" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Sekolah</label>
+                            <input type="text" id="id-sekolah" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Alamat Sekolah</label>
+                            <input type="text" id="id-alamat" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Kepala Sekolah</label>
+                            <input type="text" id="id-kepsek" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">NIP Kepala Sekolah</label>
+                            <input type="text" id="id-nip-kepsek" class="w-full border p-2 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Guru Mapel</label>
+                            <input type="text" id="id-guru" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">NIP Guru</label>
+                            <input type="text" id="id-nip-guru" class="w-full border p-2 rounded">
+                        </div>
+                        <button type="submit" class="md:col-span-2 py-3 bg-blue-600 text-white font-bold rounded mt-2">Simpan Identitas</button>
+                    </form>
+                </div>
+
+                <!-- Tab: Master Data -->
+                <div id="tab-master" class="admin-tab hidden space-y-6">
+                    <h2 class="text-2xl font-bold">Master Data</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-5 rounded-xl shadow-sm">
+                            <h3 class="font-bold mb-4 border-b pb-2">Mata Pelajaran & KKM</h3>
+                            <div class="space-y-3">
+                                <div><label class="text-sm font-bold">Nama Mata Pelajaran</label><input type="text" id="m-mapel" class="w-full border p-2 rounded mt-1" onchange="saveMaster()"></div>
+                                <div><label class="text-sm font-bold">Tahun Pelajaran</label><input type="text" id="m-tapel" class="w-full border p-2 rounded mt-1" onchange="saveMaster()"></div>
+                                <div><label class="text-sm font-bold">KKM</label><input type="number" id="m-kkm" class="w-full border p-2 rounded mt-1" onchange="saveMaster()"></div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-sm">
+                            <h3 class="font-bold mb-4 border-b pb-2">Kelola Kelas</h3>
+                            <div class="flex gap-2 mb-3">
+                                <input type="text" id="in-kelas" class="flex-1 border p-2 rounded" placeholder="Misal: X IPA 1">
+                                <button onclick="addClass()" class="bg-green-600 text-white px-4 rounded"><i class="fas fa-plus"></i></button>
+                            </div>
+                            <ul id="list-kelas" class="divide-y border rounded max-h-40 overflow-y-auto"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Bank Soal -->
+                <div id="tab-banksoal" class="admin-tab hidden space-y-4">
+                    <div class="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
+                        <h2 class="text-2xl font-bold">Bank Soal</h2>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="printNaskah()" class="bg-slate-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-print"></i> Cetak Naskah</button>
+                            <button onclick="document.getElementById('import-json').click()" class="bg-yellow-600 text-white px-3 py-2 rounded text-sm"><i class="fas fa-upload"></i> Import</button>
+                            <input type="file" id="import-json" hidden accept=".json" onchange="importSoal(event)">
+                            <button onclick="exportSoal()" class="bg-purple-600 text-white px-3 py-2 rounded text-sm"><i class="fas fa-download"></i> Export</button>
+                            <button onclick="openSoalModal()" class="bg-blue-600 text-white px-3 py-2 rounded text-sm font-bold"><i class="fas fa-plus"></i> Tambah Soal</button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto w-full">
+                            <table class="min-w-full divide-y">
+                                <thead class="bg-slate-100">
+                                    <tr><th class="p-3 text-left">No</th><th class="p-3 text-left">Tipe</th><th class="p-3 text-left w-1/2">Soal</th><th class="p-3 text-center">Bobot</th><th class="p-3 text-center">Aksi</th></tr>
+                                </thead>
+                                <tbody id="t-soal" class="divide-y text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Soal Modal Editor -->
+                <div id="modal-soal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                        <div class="p-4 border-b flex justify-between bg-slate-50 rounded-t-xl"><h3 class="font-bold text-lg" id="soal-modal-title">Editor Soal</h3><button onclick="closeSoalModal()"><i class="fas fa-times"></i></button></div>
+                        <div class="p-4 flex-1 overflow-y-auto space-y-4">
+                            <div class="flex gap-4">
+                                <div class="flex-1">
+                                    <label class="block text-sm font-bold mb-1">Tipe Soal</label>
+                                    <select id="s-tipe" class="w-full border p-2 rounded" onchange="renderSoalForm()">
+                                        <option value="pg">Pilihan Ganda (1 Jawaban)</option>
+                                        <option value="pgk">PG Kompleks (Multi Jawaban)</option>
+                                        <option value="bs">Benar / Salah</option>
+                                        <option value="jodoh">Menjodohkan</option>
+                                        <option value="isian">Isian Singkat</option>
+                                        <option value="uraian">Uraian</option>
+                                    </select>
+                                </div>
+                                <div class="w-24">
+                                    <label class="block text-sm font-bold mb-1">Bobot</label>
+                                    <input type="number" id="s-bobot" class="w-full border p-2 rounded" value="1" min="1">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold mb-1">Pertanyaan</label>
+                                <textarea id="s-teks" class="w-full border p-2 rounded h-24" placeholder="Ketik soal..."></textarea>
+                            </div>
+                            <div id="s-dynamic-area" class="border p-4 bg-slate-50 rounded"></div>
+                        </div>
+                        <div class="p-4 border-t bg-slate-100 flex justify-end gap-2 rounded-b-xl">
+                            <button onclick="closeSoalModal()" class="px-4 py-2 bg-gray-300 rounded">Batal</button>
+                            <button onclick="saveSoal()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Simpan</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Kelola Ujian -->
+                <div id="tab-ujian" class="admin-tab hidden space-y-4">
+                    <h2 class="text-2xl font-bold">Kelola Ujian</h2>
+                    <div class="bg-white p-6 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-bold border-b pb-2 mb-4">Kontrol Sesi</h3>
+                            <div class="flex items-center gap-4 mb-4">
+                                <button id="btn-toggle-ujian" onclick="toggleUjian()" class="px-4 py-2 bg-green-600 text-white rounded font-bold">Buka Ujian</button>
+                                <span id="lbl-status-ujian" class="text-red-500 font-bold"><i class="fas fa-circle text-xs"></i> Ditutup</span>
+                            </div>
+                            <label class="block text-sm font-bold mb-1">Durasi Ujian (Menit)</label>
+                            <input type="number" id="u-durasi" class="w-full border p-2 rounded mb-4" onchange="saveMaster()">
+                        </div>
+                        <div>
+                            <h3 class="font-bold border-b pb-2 mb-4">Token Akses</h3>
+                            <div class="flex gap-2 mb-2">
+                                <input type="text" id="u-token" class="flex-1 border p-2 rounded text-center text-2xl font-mono font-bold tracking-widest bg-slate-100" readonly>
+                                <button onclick="generateToken()" class="bg-blue-600 text-white px-4 rounded"><i class="fas fa-sync"></i></button>
+                            </div>
+                            <p class="text-sm text-gray-500">Berikan token ini kepada siswa agar bisa masuk ke ruang CBT.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Laporan -->
+                <div id="tab-laporan" class="admin-tab hidden space-y-4">
+                    <h2 class="text-2xl font-bold">Hasil Ujian & Analisis</h2>
+                    <div class="bg-white p-4 rounded-xl shadow-sm">
+                        <div class="flex flex-col md:flex-row justify-between mb-4 gap-2">
+                            <div class="flex gap-2">
+                                <button onclick="switchRep('rekap')" id="btn-rep-rekap" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">Rekap Nilai</button>
+                                <button onclick="switchRep('analisis')" id="btn-rep-analisis" class="px-3 py-1 bg-slate-200 text-slate-700 rounded text-sm">Analisis Butir Soal</button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="printReport()" class="px-3 py-1 bg-slate-700 text-white rounded text-sm"><i class="fas fa-print"></i> Cetak / PDF</button>
+                                <button onclick="clearResults()" class="px-3 py-1 bg-red-600 text-white rounded text-sm"><i class="fas fa-trash"></i> Hapus Semua</button>
+                            </div>
+                        </div>
+                        
+                        <div id="rep-rekap">
+                            <div class="w-full max-w-md mx-auto mb-6 h-48">
+                                <canvas id="chart-nilai"></canvas>
+                            </div>
+                            <div class="overflow-x-auto w-full">
+                                <table class="min-w-full divide-y border">
+                                    <thead class="bg-slate-100"><tr><th class="p-2 border">No</th><th class="p-2 border">Nama</th><th class="p-2 border">Kelas</th><th class="p-2 border">Nilai</th><th class="p-2 border">Ket.</th></tr></thead>
+                                    <tbody id="t-rekap" class="text-sm text-center"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="rep-analisis" class="hidden overflow-x-auto w-full">
+                            <p class="text-xs text-gray-500 mb-2">*Tabel analisis difokuskan pada tipe Pilihan Ganda (PG).</p>
+                            <table class="min-w-full divide-y border text-sm">
+                                <thead class="bg-slate-100" id="t-head-analisis"></thead>
+                                <tbody id="t-body-analisis"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Jurnal -->
+                <div id="tab-jurnal" class="admin-tab hidden space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold">Jurnal Harian</h2>
+                        <button onclick="printJurnal()" class="bg-slate-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-print"></i> Cetak</button>
+                    </div>
+                    <form onsubmit="saveJurnal(event)" class="bg-white p-4 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div><label class="block text-xs font-bold mb-1">Tanggal</label><input type="date" id="j-tgl" class="w-full border p-2 rounded" required></div>
+                        <div><label class="block text-xs font-bold mb-1">Kelas</label><select id="j-kls" class="w-full border p-2 rounded"></select></div>
+                        <div><label class="block text-xs font-bold mb-1">Jam Ke</label><input type="text" id="j-jam" class="w-full border p-2 rounded" placeholder="1-2" required></div>
+                        <div class="md:col-span-4"><label class="block text-xs font-bold mb-1">Materi / Kegiatan</label><textarea id="j-mat" class="w-full border p-2 rounded" required></textarea></div>
+                        <button type="submit" class="bg-blue-600 text-white font-bold py-2 rounded">Tambah</button>
+                    </form>
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto w-full">
+                            <table class="min-w-full divide-y">
+                                <thead class="bg-slate-100"><tr><th class="p-3 text-left">Tanggal</th><th class="p-3 text-left">Kelas (Jam)</th><th class="p-3 text-left w-1/2">Materi</th><th class="p-3 text-center no-print">Aksi</th></tr></thead>
+                                <tbody id="t-jurnal" class="divide-y text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+
+        <!-- VIEW: Student Login (Token) -->
+        <div id="view-student_login" class="view-section hidden flex-1 flex flex-col md:flex-row h-full">
+            <div class="md:w-1/2 bg-blue-600 flex flex-col justify-center items-center p-8 text-white text-center">
+                <i class="fas fa-graduation-cap text-6xl mb-4"></i>
+                <h2 class="text-3xl font-bold mb-2">Portal Ujian Siswa</h2>
+                <p id="cbt-sekolah" class="font-medium text-blue-200 uppercase"></p>
+                <p id="cbt-mapel-info" class="mt-4 bg-blue-700 px-4 py-1 rounded-full text-sm"></p>
+            </div>
+            <div class="md:w-1/2 bg-slate-50 flex items-center justify-center p-8 overflow-y-auto">
+                <div class="w-full max-w-sm bg-white p-6 rounded-2xl shadow-lg border-t-4 border-blue-600">
+                    <h3 class="font-bold text-xl mb-6 text-center text-gray-800">Identitas & Token</h3>
+                    <div class="space-y-4">
+                        <div><label class="text-sm font-bold text-gray-700">Nama Lengkap</label><input type="text" id="c-nama" class="w-full border-2 p-2 rounded-lg mt-1 uppercase" required></div>
+                        <div><label class="text-sm font-bold text-gray-700">Kelas</label><select id="c-kelas" class="w-full border-2 p-2 rounded-lg mt-1"></select></div>
+                        <div><label class="text-sm font-bold text-gray-700">Token Ujian</label><input type="text" id="c-token" class="w-full border-2 p-2 rounded-lg mt-1 text-center font-mono font-bold text-xl uppercase tracking-widest bg-yellow-50" required></div>
+                        <button onclick="startUjian()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md text-lg">Mulai Ujian</button>
+                        <button onclick="nav('home')" class="w-full py-2 bg-slate-200 text-slate-700 font-bold rounded-lg mt-2 text-sm">Kembali</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Student CBT Interactive Room -->
+        <div id="view-student_exam" class="view-section hidden flex-1 flex flex-col bg-slate-100 h-full relative">
+            
+            <!-- CBT Header (Sticky Top) -->
+            <header class="bg-blue-700 text-white p-3 flex justify-between items-center shadow-md shrink-0 sticky top-0 z-10">
+                <div class="truncate pr-2">
+                    <div class="font-bold truncate" id="ex-nama">NAMA</div>
+                    <div class="text-xs text-blue-200 truncate" id="ex-kelas">KELAS</div>
+                </div>
+                <div class="flex items-center gap-2 md:gap-4 shrink-0">
+                    <div class="bg-blue-900 px-3 py-1 md:py-2 rounded-lg font-mono text-lg md:text-xl font-bold tracking-wider border border-blue-500 shadow-inner" id="ex-timer">00:00:00</div>
+                    <button onclick="reqSubmitUjian()" class="bg-red-500 hover:bg-red-600 px-3 py-1 md:py-2 rounded-lg font-bold shadow text-sm md:text-base">Selesai</button>
+                </div>
+            </header>
+
+            <div class="flex flex-1 overflow-hidden relative">
+                <!-- Main Question Canvas -->
+                <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 relative scroll-smooth" id="cbt-main">
+                    <div class="bg-white rounded-xl shadow p-5 md:p-8 max-w-4xl mx-auto min-h-full flex flex-col">
+                        
+                        <div class="flex justify-between items-center border-b pb-3 mb-5">
+                            <span class="font-bold text-lg md:text-xl bg-slate-200 px-3 py-1 rounded-lg" id="ex-no">Soal No. 1</span>
+                            <span class="text-xs font-bold text-white bg-blue-500 px-2 py-1 rounded" id="ex-tipe">PG</span>
+                        </div>
+                        
+                        <!-- Question Text -->
+                        <div id="ex-soal" class="text-base md:text-lg mb-6 whitespace-pre-wrap font-medium text-gray-800 leading-relaxed"></div>
+                        
+                        <!-- Interactive Answer Area -->
+                        <div id="ex-ans-area" class="flex-1 mb-8"></div>
+
+                        <!-- Lower Actions -->
+                        <div class="mt-auto pt-4 border-t flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div class="flex gap-2 w-full md:w-auto">
+                                <button onclick="navQ(-1)" id="btn-prev" class="flex-1 md:flex-none px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold"><i class="fas fa-chevron-left"></i> Prev</button>
+                                <button onclick="navQ(1)" id="btn-next" class="flex-1 md:flex-none px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold">Next <i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <label class="flex items-center gap-2 cursor-pointer bg-yellow-100 px-4 py-2 rounded-lg border border-yellow-300 w-full md:w-auto justify-center">
+                                <input type="checkbox" id="chk-ragu" class="w-5 h-5 text-yellow-600" onchange="toggleRagu()">
+                                <span class="font-bold text-yellow-700">Ragu-Ragu</span>
+                            </label>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Navigation Sidebar (Desktop) -->
+                <aside class="hidden md:flex w-72 bg-white border-l shadow-inner flex-col shrink-0">
+                    <div class="p-4 bg-slate-50 border-b font-bold text-center">Navigasi Soal</div>
+                    <div class="p-4 grid grid-cols-5 gap-2 overflow-y-auto content-start" id="grid-nav"></div>
+                </aside>
+
+                <!-- Mobile Floating Nav Button -->
+                <button onclick="document.getElementById('mobile-nav-panel').classList.toggle('translate-y-full')" class="md:hidden fixed bottom-6 right-6 bg-slate-800 text-white w-14 h-14 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.3)] z-40 flex items-center justify-center text-xl">
+                    <i class="fas fa-th"></i>
+                </button>
+                
+                <!-- Mobile Navigation Panel (Bottom Sheet) -->
+                <div id="mobile-nav-panel" class="md:hidden fixed inset-x-0 bottom-0 bg-white border-t rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.2)] z-30 transition-transform transform translate-y-full flex flex-col max-h-[60vh]">
+                    <div class="p-3 bg-slate-100 rounded-t-2xl flex justify-between items-center border-b font-bold">
+                        <span>Navigasi Soal</span>
+                        <button onclick="document.getElementById('mobile-nav-panel').classList.add('translate-y-full')"><i class="fas fa-times text-xl"></i></button>
+                    </div>
+                    <div class="p-4 grid grid-cols-6 gap-2 overflow-y-auto flex-1" id="grid-nav-m"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: Student Result/Transcript -->
+        <div id="view-student_result" class="view-section hidden flex-1 flex items-center justify-center p-4 bg-slate-100">
+            <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center" id="card-transkrip">
+                <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
+                <h2 class="text-2xl font-bold mb-1">Ujian Selesai!</h2>
+                <p class="text-gray-500 mb-6 font-medium" id="res-nama">Nama Siswa</p>
+                <div class="bg-slate-50 rounded-xl p-6 border mb-6">
+                    <p class="text-sm font-bold text-slate-500">Nilai Akhir (Skala 100)</p>
+                    <div class="text-6xl font-black text-blue-600 my-2" id="res-nilai">0</div>
+                    <div id="res-status" class="inline-block px-4 py-1 rounded-full text-sm font-bold mt-2">Status</div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="nav('home')" class="flex-1 py-3 bg-slate-800 text-white rounded-lg font-bold">Tutup</button>
+                    <button onclick="printTranskrip()" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold"><i class="fas fa-print"></i> Simpan Bukti</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Print Container (Only visible during print/pdf) -->
+    <div id="print-wrapper" class="hidden absolute top-0 left-0 w-full min-h-screen bg-white z-[200] p-4 text-black overflow-y-auto">
+        <div class="flex justify-end gap-2 mb-4 no-print fixed top-4 right-4 z-[201]">
+            <button onclick="document.getElementById('print-wrapper').classList.add('hidden')" class="px-4 py-2 bg-slate-200 rounded font-bold border shadow">Tutup</button>
+            <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold shadow"><i class="fas fa-print"></i> Print</button>
+            <button onclick="downloadPdf()" class="px-4 py-2 bg-red-600 text-white rounded font-bold shadow"><i class="fas fa-file-pdf"></i> PDF</button>
+        </div>
+        <div id="print-content" class="w-full max-w-[210mm] mx-auto bg-white p-4 sm:p-8 min-h-[297mm]">
+            <!-- Kop Injected -->
+            <div id="print-kop"></div>
+            <!-- Title -->
+            <h3 id="print-title" class="text-xl font-bold text-center my-6 uppercase">JUDUL</h3>
+            <!-- Body -->
+            <div id="print-body" class="w-full text-sm"></div>
+            <!-- Signatures Injected -->
+            <div id="print-ttd"></div>
+        </div>
+    </div>
+
+    <script>
+        // Default Data Structure
+        const defData = {
+            id: { dinas: 'PEMERINTAH PROVINSI KALIMANTAN BARAT\nDINAS PENDIDIKAN DAN KEBUDAYAAN', sekolah: 'SMA NEGERI 1 SIMPANG HULU', alamat: 'Jl. Balai Berkuak - Sandai, Ketapang', kepsek: 'Sabinus Sasmi M, S.Pd.', nip_kepsek: '19750824 200604 1 008', guru: 'Sabinus Sasmi M, S.Pd.', nip_guru: '19750824 200604 1 008' },
+            master: { mapel: 'Pendidikan Agama Katolik', tapel: '2023/2024', kkm: 75, kelas: ['X IPA 1', 'X IPA 2'] },
+            pwd: 'anu',
+            ujian: { aktif: false, token: 'ABCDE', durasi: 90 },
+            soal: [], results: [], jurnal: []
+        };
+
+        // Load or Init State
+        let db = {
+            id: JSON.parse(localStorage.getItem('cbt_id')) || defData.id,
+            master: JSON.parse(localStorage.getItem('cbt_master')) || defData.master,
+            pwd: localStorage.getItem('cbt_pwd') || defData.pwd,
+            ujian: JSON.parse(localStorage.getItem('cbt_ujian')) || defData.ujian,
+            soal: JSON.parse(localStorage.getItem('cbt_soal')) || defData.soal,
+            results: JSON.parse(localStorage.getItem('cbt_results')) || defData.results,
+            jurnal: JSON.parse(localStorage.getItem('cbt_jurnal')) || defData.jurnal
+        };
+
+        // UI Helpers
+        function alertBox(msg, onOk=null) {
+            document.getElementById('modal-title').innerText = 'Informasi';
+            document.getElementById('modal-msg').innerText = msg;
+            document.getElementById('modal-btn-cancel').classList.add('hidden');
+            let okBtn = document.getElementById('modal-btn-ok');
+            okBtn.onclick = () => { document.getElementById('modal-alert').classList.add('hidden'); if(onOk) onOk(); };
+            document.getElementById('modal-alert').classList.remove('hidden');
+        }
+        function confirmBox(msg, onYes) {
+            document.getElementById('modal-title').innerText = 'Konfirmasi';
+            document.getElementById('modal-msg').innerText = msg;
+            document.getElementById('modal-btn-cancel').classList.remove('hidden');
+            document.getElementById('modal-btn-cancel').onclick = () => document.getElementById('modal-alert').classList.add('hidden');
+            let okBtn = document.getElementById('modal-btn-ok');
+            okBtn.onclick = () => { document.getElementById('modal-alert').classList.add('hidden'); onYes(); };
+            document.getElementById('modal-alert').classList.remove('hidden');
+        }
+
+        function nav(view) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById('view-'+view).classList.remove('hidden');
+            if(view === 'home') updateGlobalLabels();
+            if(view === 'student_login') populateStudentLogin();
+        }
+        
+        function updateGlobalLabels() {
+            document.getElementById('lbl-school-name').innerText = db.id.sekolah;
+            document.getElementById('cbt-sekolah').innerText = db.id.sekolah;
+            document.getElementById('cbt-mapel-info').innerText = `${db.master.mapel} | ${db.master.tapel}`;
+        }
+
+        function loginTeacher() {
+            if(document.getElementById('input-teacher-pwd').value === db.pwd) {
+                document.getElementById('input-teacher-pwd').value = '';
+                nav('teacher_dash');
+                document.getElementById('lbl-guru-name').innerText = db.id.guru.split(',')[0];
+                showAdminTab('dash');
+            } else { alertBox('Sandi Salah!'); }
+        }
+        function logoutTeacher() { nav('home'); }
+        function toggleSidebar() { document.getElementById('teacher-sidebar').classList.toggle('-translate-x-full'); document.getElementById('sidebar-overlay').classList.toggle('hidden'); }
+        
+        function showAdminTab(tab) {
+            document.querySelectorAll('.admin-tab').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.admin-nav').forEach(el => { el.classList.remove('bg-blue-600'); el.classList.add('hover:bg-slate-700'); });
+            document.getElementById('tab-'+tab).classList.remove('hidden');
+            let link = document.getElementById('nav-'+tab);
+            if(link) { link.classList.add('bg-blue-600'); link.classList.remove('hover:bg-slate-700'); }
+            
+            // Render content based on tab
+            if(tab === 'dash') updateDash();
+            if(tab === 'identitas') renderIdentitas();
+            if(tab === 'master') renderMaster();
+            if(tab === 'banksoal') renderSoal();
+            if(tab === 'ujian') renderUjian();
+            if(tab === 'laporan') renderLaporan();
+            if(tab === 'jurnal') renderJurnal();
+        }
+
+        function updateDash() {
+            document.getElementById('stat-ujian').innerText = db.ujian.aktif ? 'AKTIF' : 'NONAKTIF';
+            document.getElementById('stat-ujian').className = 'text-xl font-bold ' + (db.ujian.aktif ? 'text-green-600' : 'text-red-500');
+            document.getElementById('stat-token').innerText = db.ujian.token;
+            document.getElementById('stat-soal').innerText = db.soal.length;
+            document.getElementById('stat-peserta').innerText = db.results.length;
+        }
+
+        // Master & Identitas
+        function renderIdentitas() {
+            ['dinas','sekolah','alamat','kepsek','nip_kepsek','guru','nip_guru'].forEach(k => document.getElementById('id-'+k.replace('_','-')).value = db.id[k]);
+        }
+        function saveIdentitas(e) {
+            e.preventDefault();
+            ['dinas','sekolah','alamat','kepsek','nip_kepsek','guru','nip_guru'].forEach(k => db.id[k] = document.getElementById('id-'+k.replace('_','-')).value);
+            localStorage.setItem('cbt_id', JSON.stringify(db.id));
+            alertBox('Identitas Disimpan.'); updateGlobalLabels();
+        }
+        
+        function renderMaster() {
+            document.getElementById('m-mapel').value = db.master.mapel;
+            document.getElementById('m-tapel').value = db.master.tapel;
+            document.getElementById('m-kkm').value = db.master.kkm;
+            let lst = document.getElementById('list-kelas'); lst.innerHTML = '';
+            db.master.kelas.forEach((c,i) => lst.innerHTML += `<li class="flex justify-between p-2 hover:bg-slate-50 border-b last:border-0"><span class="font-bold text-sm">${c}</span><button onclick="delClass(${i})" class="text-red-500"><i class="fas fa-trash"></i></button></li>`);
+        }
+        function saveMaster() {
+            db.master.mapel = document.getElementById('m-mapel').value;
+            db.master.tapel = document.getElementById('m-tapel').value;
+            db.master.kkm = parseFloat(document.getElementById('m-kkm').value) || 75;
+            localStorage.setItem('cbt_master', JSON.stringify(db.master));
+        }
+        function addClass() {
+            let v = document.getElementById('in-kelas').value.trim();
+            if(v && !db.master.kelas.includes(v)) { db.master.kelas.push(v); document.getElementById('in-kelas').value=''; saveMaster(); renderMaster(); }
+        }
+        function delClass(i) { db.master.kelas.splice(i,1); saveMaster(); renderMaster(); }
+
+        let editSoalIdx = -1;
+        function renderSoal() {
+            let tb = document.getElementById('t-soal'); tb.innerHTML = '';
+            const tmap = {pg:'PG', pgk:'PG Kompleks', bs:'Benar/Salah', jodoh:'Menjodohkan', isian:'Isian', uraian:'Uraian'};
+            db.soal.forEach((s,i) => {
+                let txt = s.t.length > 50 ? s.t.substring(0,50)+'...' : s.t;
+                tb.innerHTML += `<tr><td class="p-3">${i+1}</td><td class="p-3"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-bold">${tmap[s.type]}</span></td><td class="p-3">${txt}</td><td class="p-3 text-center">${s.w}</td><td class="p-3 text-center"><button onclick="editSoal(${i})" class="text-blue-500 mr-2"><i class="fas fa-edit"></i></button><button onclick="delSoal(${i})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`;
+            });
+        }
+        function openSoalModal(idx = -1) {
+            editSoalIdx = idx; document.getElementById('modal-soal').classList.remove('hidden');
+            let sel = document.getElementById('s-tipe');
+            if(idx > -1) {
+                let s = db.soal[idx]; sel.value = s.type; sel.disabled = true;
+                document.getElementById('s-teks').value = s.t; document.getElementById('s-bobot').value = s.w;
+            } else { sel.value = 'pg'; sel.disabled = false; document.getElementById('s-teks').value=''; document.getElementById('s-bobot').value='1'; }
+            renderSoalForm(idx > -1 ? db.soal[idx] : null);
+        }
+        function closeSoalModal() { document.getElementById('modal-soal').classList.add('hidden'); }
+        
+        function renderSoalForm(s = null) {
+            let tp = document.getElementById('s-tipe').value;
+            let d = document.getElementById('s-dynamic-area'); d.innerHTML = '';
+            if(tp === 'pg') {
+                d.innerHTML = '<p class="text-xs font-bold mb-2">Pilihan (Pilih 1 Radio sebagai Kunci)</p>';
+                for(let i=0;i<5;i++) d.innerHTML += `<div class="flex items-center gap-2 mb-2"><input type="radio" name="e_pg" value="${i}" ${s&&s.ans===i?'checked':''}> <span class="font-bold">${String.fromCharCode(65+i)}.</span> <input type="text" id="e_pg_${i}" class="flex-1 border p-1 rounded" value="${s?s.opt[i]:''}"></div>`;
+            } else if(tp === 'pgk') {
+                d.innerHTML = '<p class="text-xs font-bold mb-2">Pilihan (Centang yang Benar)</p>';
+                for(let i=0;i<5;i++) d.innerHTML += `<div class="flex items-center gap-2 mb-2"><input type="checkbox" id="e_pgkc_${i}" ${s&&s.ans.includes(i)?'checked':''}> <input type="text" id="e_pgk_${i}" class="flex-1 border p-1 rounded" value="${s?s.opt[i]:''}" placeholder="Opsi ${i+1}"></div>`;
+            } else if(tp === 'bs') {
+                d.innerHTML = `<p class="text-xs font-bold mb-1">Pernyataan (1 per baris)</p><textarea id="e_bs_stmts" class="w-full h-20 border p-1 rounded mb-2 text-sm">${s?s.stmts.join('\n'):''}</textarea><p class="text-xs font-bold mb-1">Kunci (B/S, pisah koma ex: B,S,B)</p><input type="text" id="e_bs_ans" class="w-full border p-1 rounded" value="${s?s.ans.join(','):''}">`;
+            } else if(tp === 'jodoh') {
+                d.innerHTML = '<p class="text-xs font-bold mb-2">Pasangan (Kiri = Kanan)</p>';
+                for(let i=0;i<4;i++) d.innerHTML += `<div class="flex gap-2 mb-2"><input type="text" id="e_j_l_${i}" class="flex-1 border p-1 rounded" value="${s&&s.pairs[i]?s.pairs[i].l:''}" placeholder="Kiri"><i class="fas fa-arrows-alt-h my-auto"></i><input type="text" id="e_j_r_${i}" class="flex-1 border p-1 rounded" value="${s&&s.pairs[i]?s.pairs[i].r:''}" placeholder="Kanan (Kunci)"></div>`;
+            } else if(tp === 'isian') {
+                d.innerHTML = `<p class="text-xs font-bold mb-1">Kunci Jawaban Singkat</p><input type="text" id="e_is" class="w-full border p-1 rounded" value="${s?s.ans:''}">`;
+            } else if(tp === 'uraian') {
+                d.innerHTML = `<p class="text-xs font-bold mb-1">Pedoman Jawaban Uraian (Opsional)</p><textarea id="e_ur" class="w-full h-20 border p-1 rounded text-sm">${s?s.ans:''}</textarea><p class="text-[10px] text-red-500">*Uraian tidak dinilai otomatis.</p>`;
+            }
+        }
+
+        function saveSoal() {
+            let tp = document.getElementById('s-tipe').value;
+            let q = { type: tp, t: document.getElementById('s-teks').value, w: parseFloat(document.getElementById('s-bobot').value)||1 };
+            
+            if(tp==='pg') {
+                q.opt = []; for(let i=0;i<5;i++) q.opt.push(document.getElementById(`e_pg_${i}`).value);
+                let a = document.querySelector('input[name="e_pg"]:checked');
+                if(!a) return alertBox('Pilih kunci jawaban!'); q.ans = parseInt(a.value);
+            } else if(tp==='pgk') {
+                q.opt=[]; q.ans=[]; for(let i=0;i<5;i++){ let v=document.getElementById(`e_pgk_${i}`).value; if(v){q.opt.push(v); if(document.getElementById(`e_pgkc_${i}`).checked) q.ans.push(i);} }
+            } else if(tp==='bs') {
+                q.stmts = document.getElementById('e_bs_stmts').value.split('\n').filter(x=>x.trim()!=='');
+                q.ans = document.getElementById('e_bs_ans').value.toUpperCase().split(',').map(x=>x.trim());
+            } else if(tp==='jodoh') {
+                q.pairs = []; for(let i=0;i<4;i++){ let l=document.getElementById(`e_j_l_${i}`).value, r=document.getElementById(`e_j_r_${i}`).value; if(l&&r) q.pairs.push({l,r}); }
+            } else if(tp==='isian') { q.ans = document.getElementById('e_is').value; }
+            else if(tp==='uraian') { q.ans = document.getElementById('e_ur').value; }
+
+            if(editSoalIdx > -1) db.soal[editSoalIdx] = q; else db.soal.push(q);
+            localStorage.setItem('cbt_soal', JSON.stringify(db.soal));
+            closeSoalModal(); renderSoal();
+        }
+        function delSoal(i) { confirmBox('Hapus soal ini?', () => { db.soal.splice(i,1); localStorage.setItem('cbt_soal', JSON.stringify(db.soal)); renderSoal(); }); }
+        
+        function exportSoal() {
+            let a = document.createElement('a'); a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(db.soal));
+            a.download = 'bank_soal.json'; a.click();
+        }
+        function importSoal(e) {
+            let f = e.target.files[0]; if(!f) return; let r = new FileReader();
+            r.onload = function(ev) { try{ let d = JSON.parse(ev.target.result); if(Array.isArray(d)) { db.soal = db.soal.concat(d); localStorage.setItem('cbt_soal', JSON.stringify(db.soal)); renderSoal(); alertBox('Import sukses.'); } }catch(e){alertBox('JSON tidak valid');} };
+            r.readAsText(f); e.target.value = null;
+        }
+
+        function renderUjian() {
+            document.getElementById('u-token').value = db.ujian.token;
+            document.getElementById('u-durasi').value = db.ujian.durasi;
+            updUjianUI();
+        }
+        function updUjianUI() {
+            let btn = document.getElementById('btn-toggle-ujian'), lbl = document.getElementById('lbl-status-ujian');
+            if(db.ujian.aktif) { btn.className = 'px-4 py-2 bg-red-600 text-white rounded font-bold'; btn.innerText = 'Tutup Ujian'; lbl.innerHTML = '<i class="fas fa-circle text-xs"></i> Sedang Aktif'; lbl.className = 'text-green-600 font-bold'; }
+            else { btn.className = 'px-4 py-2 bg-green-600 text-white rounded font-bold'; btn.innerText = 'Buka Ujian'; lbl.innerHTML = '<i class="fas fa-circle text-xs"></i> Ditutup'; lbl.className = 'text-red-500 font-bold'; }
+        }
+        function toggleUjian() { db.ujian.aktif = !db.ujian.aktif; db.ujian.durasi = parseInt(document.getElementById('u-durasi').value)||90; localStorage.setItem('cbt_ujian', JSON.stringify(db.ujian)); updUjianUI(); }
+        function generateToken() {
+            const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let t = '';
+            for(let i=0;i<5;i++) t += ch.charAt(Math.floor(Math.random()*ch.length));
+            db.ujian.token = t; localStorage.setItem('cbt_ujian', JSON.stringify(db.ujian)); document.getElementById('u-token').value = t;
+        }
+
+        let mainChart = null;
+        function renderLaporan() {
+            let tb = document.getElementById('t-rekap'); tb.innerHTML='';
+            let vals = {tuntas:0, tidak:0};
+            db.results.forEach((r,i) => {
+                let isTuntas = r.score >= db.master.kkm;
+                if(isTuntas) vals.tuntas++; else vals.tidak++;
+                tb.innerHTML += `<tr><td class="p-2 border">${i+1}</td><td class="p-2 border font-bold text-left">${r.nama}</td><td class="p-2 border">${r.kelas}</td><td class="p-2 border font-bold text-blue-600">${r.score.toFixed(1)}</td><td class="p-2 border ${isTuntas?'text-green-600':'text-red-500'} font-bold">${isTuntas?'Tuntas':'Tdk'}</td></tr>`;
+            });
+
+            // Analisis PG
+            let pgIdxs = []; db.soal.forEach((s,i)=>{if(s.type==='pg')pgIdxs.push(i)});
+            let th = '<tr><th class="p-2 border">Nama</th>'; pgIdxs.forEach((_,i)=>th+=`<th class="p-2 border">S${i+1}</th>`); th+='<th class="p-2 border">% Benar</th></tr>';
+            document.getElementById('t-head-analisis').innerHTML = th;
+            let tbA = '';
+            db.results.forEach(r => {
+                tbA += `<tr><td class="p-2 border text-left">${r.nama}</td>`;
+                let cor=0; pgIdxs.forEach(idx => {
+                    let c = r.details[idx] && r.details[idx].c; if(c)cor++;
+                    tbA += `<td class="p-2 border ${c?'text-green-600':'text-red-500 font-bold'}">${c?'1':'0'}</td>`;
+                });
+                let p = pgIdxs.length>0 ? (cor/pgIdxs.length)*100 : 0;
+                tbA += `<td class="p-2 border font-bold">${p.toFixed(0)}%</td></tr>`;
+            });
+            document.getElementById('t-body-analisis').innerHTML = tbA;
+
+            // Chart
+            const ctx = document.getElementById('chart-nilai').getContext('2d');
+            if(mainChart) mainChart.destroy();
+            mainChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: ['Tuntas', 'Tidak Tuntas'], datasets: [{ data: [vals.tuntas, vals.tidak], backgroundColor: ['#22c55e', '#ef4444'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+        function switchRep(tab) {
+            document.getElementById('rep-rekap').classList.add('hidden'); document.getElementById('rep-analisis').classList.add('hidden');
+            document.getElementById('btn-rep-rekap').className = 'px-3 py-1 bg-slate-200 text-slate-700 rounded text-sm';
+            document.getElementById('btn-rep-analisis').className = 'px-3 py-1 bg-slate-200 text-slate-700 rounded text-sm';
+            document.getElementById('rep-'+tab).classList.remove('hidden');
+            document.getElementById('btn-rep-'+tab).className = 'px-3 py-1 bg-blue-600 text-white rounded text-sm';
+        }
+        function clearResults() { confirmBox('Hapus SEMUA data nilai siswa?', () => { db.results=[]; localStorage.setItem('cbt_results', '[]'); renderLaporan(); updateDash(); }); }
+
+        // Jurnal
+        function renderJurnal() {
+            let sel = document.getElementById('j-kls'); sel.innerHTML = db.master.kelas.map(c=>`<option value="${c}">${c}</option>`).join('');
+            let tb = document.getElementById('t-jurnal'); tb.innerHTML='';
+            db.jurnal.sort((a,b)=>new Date(b.t)-new Date(a.t)).forEach((j,i) => {
+                tb.innerHTML += `<tr><td class="p-3">${j.t}</td><td class="p-3">${j.k} (${j.j})</td><td class="p-3">${j.m}</td><td class="p-3 text-center no-print"><button onclick="delJurnal(${i})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`;
+            });
+        }
+        function saveJurnal(e) { e.preventDefault(); db.jurnal.push({t:document.getElementById('j-tgl').value, k:document.getElementById('j-kls').value, j:document.getElementById('j-jam').value, m:document.getElementById('j-mat').value}); localStorage.setItem('cbt_jurnal', JSON.stringify(db.jurnal)); renderJurnal(); e.target.reset(); }
+        function delJurnal(i) { db.jurnal.splice(i,1); localStorage.setItem('cbt_jurnal', JSON.stringify(db.jurnal)); renderJurnal(); }
+
+        function getKop() { return `<div class="kop-surat"><h1>${db.id.dinas}</h1><h2>${db.id.sekolah}</h2><p>${db.id.alamat}</p></div><div style="text-align:center; font-weight:bold; margin-bottom:15px; font-size:12px;">MATA PELAJARAN: ${db.master.mapel.toUpperCase()} | TAPEL: ${db.master.tapel}</div>`; }
+        function getTTD() { return `<div class="signature-area"><div class="signature-box">Mengetahui,<br>Kepala Sekolah<div class="signature-name">${db.id.kepsek}</div>NIP. ${db.id.nip_kepsek}</div><div class="signature-box">Simpang Hulu, ${new Date().toLocaleDateString('id-ID')}<br>Guru Mata Pelajaran<div class="signature-name">${db.id.guru}</div>NIP. ${db.id.nip_guru}</div></div>`; }
+        
+        let pdfName = 'Dokumen';
+        function prepPrint(title, htmlBody, useTTD=true) {
+            document.getElementById('print-kop').innerHTML = getKop();
+            document.getElementById('print-title').innerText = title;
+            document.getElementById('print-body').innerHTML = htmlBody;
+            document.getElementById('print-ttd').innerHTML = useTTD ? getTTD() : '';
+            document.getElementById('print-wrapper').classList.remove('hidden');
+            pdfName = title;
+        }
+        function downloadPdf() {
+            let el = document.getElementById('print-content'); el.classList.add('pdf-mode');
+            html2pdf().set({ margin: 10, filename: pdfName.replace(/ /g,'_')+'.pdf', image: {type:'jpeg',quality:0.98}, html2canvas: {scale:2}, jsPDF: {unit:'mm',format:'a4',orientation:'portrait'} }).from(el).save().then(()=>{ el.classList.remove('pdf-mode'); });
+        }
+        function printReport() { prepPrint('Rekapitulasi Nilai Ujian', document.getElementById('t-rekap').closest('table').outerHTML); }
+        function printJurnal() { prepPrint('Jurnal Mengajar Harian', document.getElementById('t-jurnal').closest('table').outerHTML); }
+        function printTranskrip() { prepPrint('Bukti Selesai Ujian', document.getElementById('card-transkrip').innerHTML, false); document.querySelectorAll('#print-body button').forEach(b=>b.style.display='none'); }
+        function printNaskah() {
+            let h = '<ol style="padding-left:20px;list-style-type:decimal;">';
+            db.soal.forEach(q => {
+                h += `<li style="margin-bottom:15px;page-break-inside:avoid;"><div style="margin-bottom:5px;font-weight:bold;">${q.t.replace(/\n/g,'<br>')}</div>`;
+                if(q.type==='pg') { h += '<ol style="list-style-type:upper-alpha;padding-left:20px;">'; q.opt.forEach(o=>h+=`<li>${o}</li>`); h+='</ol>'; }
+                else if(q.type==='pgk') q.opt.forEach(o=>h+=`<div>[ ] ${o}</div>`);
+                else if(q.type==='bs') { h+='<table border="1" style="border-collapse:collapse;width:100%;margin-top:5px;"><tr><th style="padding:2px">Pernyataan</th><th width="40">B</th><th width="40">S</th></tr>'; q.stmts.forEach(s=>h+=`<tr><td style="padding:2px">${s}</td><td></td><td></td></tr>`); h+='</table>'; }
+                else if(q.type==='isian' || q.type==='uraian') h += '<div style="height:40px;border-bottom:1px dotted #000;margin-top:10px;"></div>';
+                h += '</li>';
+            });
+            h += '</ol>'; prepPrint('Naskah Soal Ujian', h);
+        }
+
+        let cbt = { nama:'', kelas:'', curr:0, ans:{}, ragu:{}, endTime:0, timer:null };
+        
+        function populateStudentLogin() { document.getElementById('c-kelas').innerHTML = '<option value="">- Pilih Kelas -</option>' + db.master.kelas.map(c=>`<option value="${c}">${c}</option>`).join(''); }
+        function startUjian() {
+            let n = document.getElementById('c-nama').value.trim().toUpperCase(), k = document.getElementById('c-kelas').value, t = document.getElementById('c-token').value.trim().toUpperCase();
+            if(!n || !k || !t) return alertBox('Lengkapi form login!');
+            if(!db.ujian.aktif || t !== db.ujian.token) return alertBox('Ujian tidak aktif atau Token salah!');
+            if(db.soal.length === 0) return alertBox('Soal belum tersedia.');
+            if(db.results.find(x=>x.nama===n && x.kelas===k)) return alertBox('Anda sudah menyelesaikan ujian ini.');
+
+            cbt = { nama:n, kelas:k, curr:0, ans:{}, ragu:{}, endTime: new Date().getTime() + (db.ujian.durasi*60000), timer:null };
+            document.getElementById('ex-nama').innerText = n; document.getElementById('ex-kelas').innerText = k;
+            nav('student_exam'); buildCBTGrid(); renderCQ();
+            
+            if(cbt.timer) clearInterval(cbt.timer);
+            cbt.timer = setInterval(() => {
+                let diff = cbt.endTime - new Date().getTime();
+                if(diff <= 0) { clearInterval(cbt.timer); document.getElementById('ex-timer').innerText="00:00:00"; alertBox('Waktu Habis!', doSubmitUjian); return; }
+                let h = Math.floor((diff/(1000*60*60))%24), m = Math.floor((diff/1000/60)%60), s = Math.floor((diff/1000)%60);
+                document.getElementById('ex-timer').innerText = (h<10?'0'+h:h)+":"+(m<10?'0'+m:m)+":"+(s<10?'0'+s:s);
+            }, 1000);
+        }
+
+        function buildCBTGrid() {
+            let h = ''; db.soal.forEach((s,i) => {
+                let ans = cbt.ans[i]; let isAns = ans !== undefined && ans !== null && ans !== '' && (!Array.isArray(ans) || ans.length>0);
+                let bg = isAns ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700';
+                if(cbt.ragu[i]) bg = 'bg-yellow-400 text-yellow-900';
+                let ring = i===cbt.curr ? 'ring-4 ring-blue-300 ring-offset-2' : '';
+                h += `<button onclick="jumpQ(${i})" class="w-10 h-10 md:w-12 md:h-12 rounded-lg font-bold shadow-sm ${bg} ${ring}">${i+1}</button>`;
+            });
+            document.getElementById('grid-nav').innerHTML = h; document.getElementById('grid-nav-m').innerHTML = h;
+        }
+
+        function saveCurAns() {
+            let q = db.soal[cbt.curr]; if(!q) return;
+            if(q.type==='pg') { let r = document.querySelector('input[name="c_pg"]:checked'); if(r) cbt.ans[cbt.curr]=parseInt(r.value); }
+            else if(q.type==='pgk') { let arr=[]; q.opt.forEach((_,i)=>{if(document.getElementById(`c_pgk_${i}`).checked)arr.push(i);}); if(arr.length>0)cbt.ans[cbt.curr]=arr; else delete cbt.ans[cbt.curr]; }
+            else if(q.type==='bs') { let arr=[]; q.stmts.forEach((_,i)=>{ let r=document.querySelector(`input[name="c_bs_${i}"]:checked`); arr.push(r?r.value:''); }); cbt.ans[cbt.curr]=arr; }
+            else if(q.type==='jodoh') { let arr=[]; q.pairs.forEach((_,i)=>arr.push(document.getElementById(`c_jd_${i}`).value)); cbt.ans[cbt.curr]=arr; }
+            else if(q.type==='isian' || q.type==='uraian') { cbt.ans[cbt.curr]=document.getElementById('c_txt').value; }
+        }
+
+        function renderCQ() {
+            let q = db.soal[cbt.curr]; document.getElementById('ex-no').innerText = `Soal No. ${cbt.curr+1}`;
+            const tmap = {pg:'Pilihan Ganda',pgk:'PG Kompleks',bs:'Benar/Salah',jodoh:'Menjodohkan',isian:'Isian Singkat',uraian:'Uraian'};
+            document.getElementById('ex-tipe').innerText = tmap[q.type];
+            document.getElementById('ex-soal').innerHTML = q.t.replace(/\n/g,'<br>');
+            
+            let a = document.getElementById('ex-ans-area'); let h = ''; let ans = cbt.ans[cbt.curr];
+            if(q.type==='pg') {
+                q.opt.forEach((o,i)=>{
+                    let chk = ans===i?'checked':'';
+                    h+=`<label class="flex items-start p-4 mb-3 border-2 rounded-xl cursor-pointer hover:bg-blue-50 transition cbt-radio-btn relative"><input type="radio" name="c_pg" value="${i}" ${chk} class="absolute opacity-0 w-0 h-0" onchange="buildCBTGrid()"><div class="w-6 h-6 border-2 rounded-full mr-3 flex-shrink-0 flex items-center justify-center transition ${chk?'border-blue-600 bg-blue-100':'border-gray-300'}"><div class="w-3 h-3 bg-blue-600 rounded-full ${chk?'block':'hidden'}"></div></div><span class="font-medium text-gray-700 leading-snug"><strong class="mr-1">${String.fromCharCode(65+i)}.</strong> ${o}</span></label>`;
+                });
+            } else if(q.type==='pgk') {
+                q.opt.forEach((o,i)=>{ let chk = (ans&&ans.includes(i))?'checked':''; h+=`<label class="flex items-start p-3 mb-2 border-2 rounded-xl cursor-pointer hover:bg-blue-50 transition"><input type="checkbox" id="c_pgk_${i}" ${chk} class="mt-1 w-5 h-5 text-blue-600 rounded" onchange="buildCBTGrid()"><span class="ml-3 font-medium">${o}</span></label>`; });
+            } else if(q.type==='bs') {
+                h+=`<div class="overflow-x-auto border-2 rounded-xl"><table class="min-w-full divide-y"><thead class="bg-slate-50"><tr><th class="p-3 text-left">Pernyataan</th><th class="p-3 text-center">B</th><th class="p-3 text-center">S</th></tr></thead><tbody class="divide-y">`;
+                q.stmts.forEach((s,i)=>{ h+=`<tr class="hover:bg-slate-50"><td class="p-3 font-medium">${s}</td><td class="p-3 text-center"><input type="radio" name="c_bs_${i}" value="B" ${ans&&ans[i]==='B'?'checked':''} class="w-5 h-5" onchange="buildCBTGrid()"></td><td class="p-3 text-center"><input type="radio" name="c_bs_${i}" value="S" ${ans&&ans[i]==='S'?'checked':''} class="w-5 h-5" onchange="buildCBTGrid()"></td></tr>`; }); h+='</tbody></table></div>';
+            } else if(q.type==='jodoh') {
+                let ro = q.pairs.map(x=>x.r).sort(()=>Math.random()-0.5); // shuffle rights
+                q.pairs.forEach((p,i)=>{
+                    h+=`<div class="flex flex-col md:flex-row gap-2 mb-3 p-3 border-2 rounded-xl bg-slate-50"><div class="flex-1 font-medium bg-white p-2 border rounded">${p.l}</div><select id="c_jd_${i}" class="flex-1 p-2 border rounded font-medium bg-white" onchange="buildCBTGrid()"><option value="">-- Jodohkan --</option>`;
+                    ro.forEach(o=>h+=`<option value="${o}" ${ans&&ans[i]===o?'selected':''}>${o}</option>`); h+='</select></div>';
+                });
+            } else if(q.type==='isian') { h+=`<input type="text" id="c_txt" class="w-full border-2 border-gray-300 rounded-xl p-4 text-lg font-medium focus:border-blue-500 outline-none" value="${ans||''}" placeholder="Ketik jawaban singkat..." onkeyup="buildCBTGrid()">`; }
+            else if(q.type==='uraian') { h+=`<textarea id="c_txt" class="w-full border-2 border-gray-300 rounded-xl p-4 text-base font-medium h-40 focus:border-blue-500 outline-none" placeholder="Ketik uraian..." onkeyup="buildCBTGrid()">${ans||''}</textarea>`; }
+            
+            a.innerHTML = h;
+            document.getElementById('chk-ragu').checked = !!cbt.ragu[cbt.curr];
+            document.getElementById('btn-prev').disabled = cbt.curr === 0; document.getElementById('btn-next').disabled = cbt.curr === db.soal.length-1;
+            document.getElementById('btn-prev').className = cbt.curr===0 ? 'px-4 py-3 bg-slate-100 text-slate-400 rounded-lg font-bold w-full md:w-auto' : 'px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold w-full md:w-auto';
+            document.getElementById('btn-next').className = cbt.curr===db.soal.length-1 ? 'px-4 py-3 bg-slate-100 text-slate-400 rounded-lg font-bold w-full md:w-auto' : 'px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold w-full md:w-auto';
+        }
+        function navQ(d) { saveCurAns(); cbt.curr+=d; renderCQ(); buildCBTGrid(); }
+        function jumpQ(i) { saveCurAns(); cbt.curr=i; renderCQ(); buildCBTGrid(); document.getElementById('mobile-nav-panel').classList.add('translate-y-full'); }
+        function toggleRagu() { cbt.ragu[cbt.curr] = document.getElementById('chk-ragu').checked; buildCBTGrid(); }
+
+        function reqSubmitUjian() {
+            saveCurAns(); let u=0; db.soal.forEach((_,i)=>{ if(cbt.ans[i]===undefined || cbt.ans[i]==='') u++; });
+            let msg = u>0 ? `Ada ${u} soal belum dijawab!\nYakin ingin menyelesaikan ujian?` : 'Yakin ingin menyelesaikan ujian sekarang?';
+            confirmBox(msg, doSubmitUjian);
+        }
+        function doSubmitUjian() {
+            clearInterval(cbt.timer); saveCurAns();
+            let totalW = 0, earnW = 0, det = {};
+            db.soal.forEach((q,i)=>{
+                totalW += q.w; let a = cbt.ans[i]; let c = false;
+                if(a!==undefined && a!==null) {
+                    if(q.type==='pg') c = (a===q.ans);
+                    else if(q.type==='pgk') { if(Array.isArray(a) && a.length===q.ans.length) c = a.every(x=>q.ans.includes(x)); }
+                    else if(q.type==='bs') { if(Array.isArray(a)){ let tr=0; a.forEach((x,j)=>{if(x===q.ans[j])tr++;}); if(tr===q.stmts.length) c=true; } } // Strict full
+                    else if(q.type==='jodoh') { if(Array.isArray(a)){ let tr=0; a.forEach((x,j)=>{if(x===q.pairs[j].r)tr++;}); if(tr===q.pairs.length) c=true; } } // Strict full
+                    else if(q.type==='isian') { if(typeof a==='string' && q.ans) c = (a.trim().toLowerCase()===q.ans.trim().toLowerCase()); }
+                }
+                if(c) earnW += q.w; det[i] = {c:c, a:a};
+            });
+            let fScore = totalW>0 ? (earnW/totalW)*100 : 0;
+            let res = { nama:cbt.nama, kelas:cbt.kelas, score:fScore, details:det, ts:new Date().toISOString() };
+            db.results.push(res); localStorage.setItem('cbt_results', JSON.stringify(db.results));
+            
+            nav('student_result');
+            document.getElementById('res-nama').innerText = cbt.nama;
+            document.getElementById('res-nilai').innerText = fScore.toFixed(1);
+            let sEl = document.getElementById('res-status');
+            if(fScore >= db.master.kkm) { sEl.innerText="TUNTAS KKM"; sEl.className="inline-block px-4 py-1 rounded-full text-sm font-bold mt-2 bg-green-100 text-green-700"; }
+            else { sEl.innerText="TIDAK TUNTAS"; sEl.className="inline-block px-4 py-1 rounded-full text-sm font-bold mt-2 bg-red-100 text-red-700"; }
+        }
+
+        // Initialize App
+        window.onload = () => { updateGlobalLabels(); nav('home'); };
+
+    </script>
+</body>
+</html>
